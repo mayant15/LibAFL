@@ -672,7 +672,6 @@ pub mod unix_shmem {
         #[cfg(target_vendor = "apple")]
         use alloc::string::ToString;
         use core::{
-            ffi::CStr,
             ops::{Deref, DerefMut},
             ptr, slice,
         };
@@ -1013,13 +1012,7 @@ pub mod unix_shmem {
             }
 
             fn release_shmem(&mut self, shmem: &mut Self::ShMem) {
-                let fd = CStr::from_bytes_until_nul(shmem.id().as_array())
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .parse()
-                    .unwrap();
-                unsafe { close(fd) };
+                unsafe { close(shmem.shm_fd) };
             }
         }
 
@@ -1924,6 +1917,29 @@ mod tests {
             Err(e) => panic!("{e}"),
         }
 
+        Ok(())
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn test_shmem_release() -> Result<(), Error> {
+        let mut provider = StdShMemProvider::new()?;
+        let mut shmem = provider.new_shmem(1024)?;
+        provider.release_shmem(&mut shmem);
+        drop(shmem);
+        Ok(())
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    #[cfg(unix)]
+    fn test_mmap_shmem_release() -> Result<(), Error> {
+        use crate::shmem::MmapShMemProvider;
+
+        let mut provider = MmapShMemProvider::new()?;
+        let mut shmem = provider.new_shmem(1024)?;
+        provider.release_shmem(&mut shmem);
+        drop(shmem);
         Ok(())
     }
 }
